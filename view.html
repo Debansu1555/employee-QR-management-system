@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Browser tab title -->
+    <title>Employee QR</title>
+
+    <!-- External CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<!-- Public page, no login required -->
+<body onload="loadEmployee();">
+
+    <!-- Main center container -->
+    <div class="center-box">
+
+        <!-- Card -->
+        <div class="card view-card">
+
+            <!-- Page heading -->
+            <h2>Employee QR Details</h2>
+
+            <!-- Employee data -->
+            <div id="data" class="profile-box"></div>
+
+            <!-- QR area -->
+            <div id="qrcode" class="qr-box"></div>
+
+            <!-- Download QR -->
+            <button onclick="downloadQR()">
+                Download QR
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Toast box -->
+    <div id="toast"></div>
+
+    <!-- QR library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- JS files -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/qr.js"></script>
+    <script src="js/main.js"></script>
+
+    <script>
+
+        /* Load employee from URL */
+        async function loadEmployee() {
+
+            /* Get ID from URL */
+            let params = new URLSearchParams(window.location.search);
+            let empId = params.get("id");
+
+            /* If ID missing */
+            if (!empId) {
+                document.getElementById("data").innerHTML = `
+                    <div class="profile-row">
+                        <span>Error</span>
+                        <b>No Employee ID Found</b>
+                    </div>
+                `;
+                return;
+            }
+
+            /* Fetch employee */
+            let emp = await getEmployeeById(empId);
+
+            /* If not found */
+            if (!emp) {
+                document.getElementById("data").innerHTML = `
+                    <div class="profile-row">
+                        <span>Error</span>
+                        <b>Employee Not Found</b>
+                    </div>
+                `;
+                return;
+            }
+
+            /* Show employee details */
+            document.getElementById("data").innerHTML = `
+                <div class="profile-row">
+                    <span>Name</span>
+                    <b>${emp.name}</b>
+                </div>
+
+                <div class="profile-row">
+                    <span>Employee Id</span>
+                    <b>${emp.empId}</b>
+                </div>
+
+                <div class="profile-row">
+                    <span>Mail Id</span>
+                    <b>${emp.email}</b>
+                </div>
+
+                <div class="profile-row">
+                    <span>Department</span>
+                    <b>${emp.department}</b>
+                </div>
+
+                <div class="profile-row">
+                    <span>Designation</span>
+                    <b>${emp.designation}</b>
+                </div>
+
+                <div class="profile-row">
+                    <span>Category</span>
+                    <b>${emp.category}</b>
+                </div>
+            `;
+
+            /* Generate same live QR */
+            generateQRCode("qrcode", emp);
+        }
+
+    </script>
+
+</body>
+</html>

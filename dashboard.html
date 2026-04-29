@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Browser tab title -->
+    <title>Employee Dashboard</title>
+
+    <!-- External CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<!-- Check login and load employees -->
+<body onload="checkLogin(); loadEmployees();">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+
+        <!-- Sidebar title -->
+        <h2>Admin Panel</h2>
+
+        <!-- Menu -->
+        <ul>
+            <li>Employees</li>
+        </ul>
+
+        <!-- Logout button -->
+        <button onclick="logout()">Logout</button>
+
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+
+        <!-- Topbar -->
+        <div class="topbar">
+
+            <!-- Page title -->
+            <h2>Employee Dashboard</h2>
+
+            <!-- Add employee button -->
+            <button onclick="window.location.href='add.html'">
+                Add Employee
+            </button>
+
+        </div>
+
+        <!-- Employee table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Employee ID</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th>Category</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+
+            <!-- Data will load here -->
+            <tbody id="tableBody"></tbody>
+        </table>
+
+    </div>
+
+    <!-- Toast box -->
+    <div id="toast"></div>
+
+    <!-- JS files -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/api.js"></script>
+
+    <script>
+
+        /* Load all employees */
+        async function loadEmployees() {
+
+            /* Get employees from backend */
+            let employees = await getEmployees();
+
+            /* Get table body */
+            let table = document.getElementById("tableBody");
+
+            /* Clear table */
+            table.innerHTML = "";
+
+            /* If no employees */
+            if (employees.length === 0) {
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="6">No Employees Found</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            /* Show employees */
+            employees.forEach(emp => {
+                table.innerHTML += `
+                    <tr>
+                        <td>${emp.name}</td>
+                        <td>${emp.empId}</td>
+                        <td>${emp.department}</td>
+                        <td>${emp.designation}</td>
+                        <td>${emp.category}</td>
+                        <td>
+                            <button class="action-btn view" onclick="viewEmployee('${emp.empId}')">
+                                View QR
+                            </button>
+
+                            <button class="action-btn edit" onclick="editEmployee('${emp.empId}')">
+                                Edit
+                            </button>
+
+                            <button class="action-btn delete" onclick="deleteEmployee('${emp.empId}')">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+
+        /* Open view page */
+        function viewEmployee(empId) {
+            window.location.href = `view.html?id=${empId}`;
+        }
+
+
+        /* Open edit page */
+        function editEmployee(empId) {
+            window.location.href = `edit.html?id=${empId}`;
+        }
+
+
+        /* Delete employee */
+        async function deleteEmployee(empId) {
+
+            /* Confirm delete */
+            if (confirm("Delete this employee?")) {
+
+                /* Delete from backend */
+                let res = await deleteEmployeeAPI(empId);
+
+                /* If success */
+                if (res.ok) {
+                    showToast("Employee deleted successfully");
+                    loadEmployees();
+                } else {
+                    showToast("Delete failed");
+                }
+            }
+        }
+
+    </script>
+
+</body>
+</html>

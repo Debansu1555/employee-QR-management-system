@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Browser tab title -->
+    <title>Edit Employee</title>
+
+    <!-- External CSS file -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<!-- Check login and load employee -->
+<body onload="checkLogin(); loadEditData();">
+
+    <!-- Main center container -->
+    <div class="center-box">
+
+        <!-- Card -->
+        <div class="card">
+
+            <!-- Page heading -->
+            <h2>Edit Employee</h2>
+
+            <!-- Input fields -->
+            <input id="name" placeholder="Full Name">
+            <input id="empId" placeholder="Employee ID">
+            <input id="email" placeholder="Mail ID">
+            <input id="department" placeholder="Department">
+            <input id="designation" placeholder="Designation">
+            <input id="category" placeholder="Category">
+
+            <!-- Update button -->
+            <button onclick="updateEmployee()">
+                Update & Generate QR
+            </button>
+
+            <!-- QR area -->
+            <div id="qrcode" class="qr-box"></div>
+
+            <!-- Download QR button -->
+            <button id="downloadBtn" style="display:none;" onclick="downloadQR('updated_employee_qr.png')">
+                Download QR
+            </button>
+
+            <!-- Back button -->
+            <button onclick="window.location.href='dashboard.html'">
+                Back
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Toast box -->
+    <div id="toast"></div>
+
+    <!-- QR library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- JS files -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/qr.js"></script>
+
+    <script>
+
+        /* Store old employee ID */
+        let oldEmpId = "";
+
+        /* Load employee data */
+        async function loadEditData() {
+
+            /* Get employee ID from URL */
+            let params = new URLSearchParams(window.location.search);
+            oldEmpId = params.get("id");
+
+            /* Fetch employee */
+            let emp = await getEmployeeById(oldEmpId);
+
+            /* If employee not found */
+            if (!emp) {
+                window.location.href = "dashboard.html";
+                return;
+            }
+
+            /* Fill form */
+            document.getElementById("name").value = emp.name;
+            document.getElementById("empId").value = emp.empId;
+            document.getElementById("email").value = emp.email;
+            document.getElementById("department").value = emp.department;
+            document.getElementById("designation").value = emp.designation;
+            document.getElementById("category").value = emp.category;
+
+            /* Generate current QR */
+            generateQRCode("qrcode", emp);
+
+            /* Show download button */
+            document.getElementById("downloadBtn").style.display = "block";
+        }
+
+
+        /* Update employee */
+        async function updateEmployee() {
+
+            /* Updated employee object */
+            let emp = {
+                name: document.getElementById("name").value.trim(),
+                empId: document.getElementById("empId").value.trim(),
+                email: document.getElementById("email").value.trim(),
+                department: document.getElementById("department").value.trim(),
+                designation: document.getElementById("designation").value.trim(),
+                category: document.getElementById("category").value.trim()
+            };
+
+            /* Validation */
+            if (!emp.name || !emp.empId || !emp.email || !emp.department || !emp.designation || !emp.category) {
+                showToast("Please fill all fields");
+                return;
+            }
+
+            /* Update employee in backend */
+            let res = await updateEmployeeAPI(oldEmpId, emp);
+
+            /* If update success */
+            if (res.ok) {
+                oldEmpId = emp.empId;
+                generateQRCode("qrcode", emp);
+                showToast("Employee updated and QR regenerated");
+            } else {
+                showToast("Update failed");
+            }
+        }
+
+    </script>
+
+</body>
+</html>
