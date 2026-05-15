@@ -30,14 +30,14 @@
 
             <!-- Update button -->
             <button onclick="updateEmployee()">
-                Update & Generate QR
+                Update Same QR
             </button>
 
             <!-- QR area -->
             <div id="qrcode" class="qr-box"></div>
 
             <!-- Download QR button -->
-            <button id="downloadBtn" style="display:none;" onclick="downloadQR('updated_employee_qr.png')">
+            <button id="downloadBtn" style="display:none;" onclick="downloadQR('employee_qr.png')">
                 Download QR
             </button>
 
@@ -67,6 +67,9 @@
         /* Store old employee ID */
         let oldEmpId = "";
 
+        /* Store permanent QR ID */
+        let permanentQrId = "";
+
         /* Load employee data */
         async function loadEditData() {
 
@@ -74,14 +77,28 @@
             let params = new URLSearchParams(window.location.search);
             oldEmpId = params.get("id");
 
-            /* Fetch employee */
-            let emp = await getEmployeeById(oldEmpId);
+            if (!oldEmpId) {
+                showToast("Employee ID missing");
+                setTimeout(() => {
+                    window.location.href = "dashboard.html";
+                }, 1000);
+                return;
+            }
+
+            /* Fetch employee by Employee ID */
+            let emp = await getEmployeeByEmpId(oldEmpId);
 
             /* If employee not found */
             if (!emp) {
-                window.location.href = "dashboard.html";
+                showToast("Employee not found");
+                setTimeout(() => {
+                    window.location.href = "dashboard.html";
+                }, 1000);
                 return;
             }
+
+            /* Store permanent QR ID */
+            permanentQrId = emp.qrId;
 
             /* Fill form */
             document.getElementById("name").value = emp.name;
@@ -91,7 +108,7 @@
             document.getElementById("designation").value = emp.designation;
             document.getElementById("category").value = emp.category;
 
-            /* Generate current QR */
+            /* Generate same permanent QR */
             generateQRCode("qrcode", emp);
 
             /* Show download button */
@@ -113,21 +130,42 @@
             };
 
             /* Validation */
-            if (!emp.name || !emp.empId || !emp.email || !emp.department || !emp.designation || !emp.category) {
+            if (
+                !emp.name ||
+                !emp.empId ||
+                !emp.email ||
+                !emp.department ||
+                !emp.designation ||
+                !emp.category
+            ) {
                 showToast("Please fill all fields");
                 return;
             }
 
-            /* Update employee in backend */
-            let res = await updateEmployeeAPI(oldEmpId, emp);
+            try {
 
-            /* If update success */
-            if (res.ok) {
-                oldEmpId = emp.empId;
-                generateQRCode("qrcode", emp);
-                showToast("Employee updated and QR regenerated");
-            } else {
-                showToast("Update failed");
+                /* Update employee in backend */
+                let updatedEmployee = await updateEmployeeAPI(oldEmpId, emp);
+
+                /* Update old employee ID for next update */
+                oldEmpId = updatedEmployee.empId;
+
+                /* Keep same permanent QR ID */
+                permanentQrId = updatedEmployee.qrId;
+
+                /* Regenerate visual QR with same qrId */
+                generateQRCode("qrcode", updatedEmployee);
+
+                /* Show download button */
+                document.getElementById("downloadBtn").style.display = "block";
+
+                /* Success message */
+                showToast("Employee updated. Same QR remains active.");
+
+            } catch (error) {
+
+                /* Show backend error */
+                showToast(error.message || "Update failed");
             }
         }
 

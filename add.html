@@ -76,19 +76,25 @@
             };
 
             /* Validation */
-            if (!emp.name || !emp.empId || !emp.email || !emp.department || !emp.designation || !emp.category) {
+            if (
+                !emp.name ||
+                !emp.empId ||
+                !emp.email ||
+                !emp.department ||
+                !emp.designation ||
+                !emp.category
+            ) {
                 showToast("Please fill all fields");
                 return;
             }
 
-            /* Save employee in backend */
-            let res = await addEmployeeAPI(emp);
+            try {
 
-            /* If saved successfully */
-            if (res.ok) {
+                /* Save employee in backend */
+                let savedEmployee = await addEmployeeAPI(emp);
 
-                /* Generate live URL QR */
-                generateQRCode("qrcode", emp);
+                /* Generate permanent QR using backend qrId */
+                generateQRCode("qrcode", savedEmployee);
 
                 /* Show download button */
                 document.getElementById("downloadBtn").style.display = "block";
@@ -96,11 +102,10 @@
                 /* Success message */
                 showToast("Employee added and QR generated");
 
-            } else {
+            } catch (error) {
 
                 /* Show backend error */
-                let data = await res.json();
-                showToast(data.detail || "Employee add failed");
+                showToast(error.message || "Employee add failed");
             }
         }
 

@@ -48,28 +48,28 @@
 
     <script>
 
-        /* Load employee from URL */
+        /* Load employee from QR URL */
         async function loadEmployee() {
 
-            /* Get ID from URL */
+            /* Get permanent QR ID from URL */
             let params = new URLSearchParams(window.location.search);
-            let empId = params.get("id");
+            let qrId = params.get("qr");
 
-            /* If ID missing */
-            if (!empId) {
+            /* If QR ID missing */
+            if (!qrId) {
                 document.getElementById("data").innerHTML = `
                     <div class="profile-row">
                         <span>Error</span>
-                        <b>No Employee ID Found</b>
+                        <b>No QR ID Found</b>
                     </div>
                 `;
                 return;
             }
 
-            /* Fetch employee */
-            let emp = await getEmployeeById(empId);
+            /* Fetch employee by permanent QR ID */
+            let emp = await getEmployeeByQrId(qrId);
 
-            /* If not found */
+            /* If employee not found */
             if (!emp) {
                 document.getElementById("data").innerHTML = `
                     <div class="profile-row">
@@ -113,7 +113,7 @@
                 </div>
             `;
 
-            /* Generate same live QR */
+            /* Generate same permanent QR */
             generateQRCode("qrcode", emp);
         }
 

@@ -1,36 +1,35 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from dotenv import load_dotenv
 import os
+import uuid
 
+load_dotenv()
 
-# Database URL
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./employees.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL missing in .env file")
 
-# Database connection
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+    pool_pre_ping=True
 )
 
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine
+)
 
-# Database session
-SessionLocal = sessionmaker(bind=engine)
-
-
-# Base class for database model
 Base = declarative_base()
 
+app = FastAPI(title="Employee QR Management System")
 
-# FastAPI app
-app = FastAPI()
-
-
-# CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -40,30 +39,44 @@ app.add_middleware(
 )
 
 
-# Employee table
+# =========================
+# DATABASE MODEL
+# =========================
 class Employee(Base):
     __tablename__ = "employees"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    empId = Column(String, unique=True, nullable=False)
-    email = Column(String, nullable=False)
-    department = Column(String, nullable=False)
-    designation = Column(String, nullable=False)
-    category = Column(String, nullable=False)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    qrId = Column(String(100), unique=True, nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    empId = Column(String(50), unique=True, nullable=False, index=True)
+    email = Column(String(100), nullable=False)
+    department = Column(String(100), nullable=False)
+    designation = Column(String(100), nullable=False)
+    category = Column(String(100), nullable=False)
 
 
-# Create table automatically
 Base.metadata.create_all(bind=engine)
 
 
-# Login request model
+# =========================
+# DATABASE SESSION
+# =========================
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# =========================
+# REQUEST MODELS
+# =========================
 class LoginData(BaseModel):
     email: str
     password: str
 
 
-# Employee request model
 class EmployeeData(BaseModel):
     name: str
     empId: str
@@ -73,7 +86,9 @@ class EmployeeData(BaseModel):
     category: str
 
 
-# Admin login API
+# =========================
+# LOGIN
+# =========================
 @app.post("/api/login")
 def login(data: LoginData):
     if data.email == "debanshusekhar55@gmail.com" and data.password == "1234":
@@ -82,118 +97,117 @@ def login(data: LoginData):
     raise HTTPException(status_code=401, detail="Invalid login")
 
 
-# Get all employees API
+# =========================
+# GET ALL EMPLOYEES
+# =========================
 @app.get("/api/employees")
-def get_employees():
-    db = SessionLocal()
-
-    try:
-        employees = db.query(Employee).all()
-        return employees
-
-    finally:
-        db.close()
+def get_employees(db: Session = Depends(get_db)):
+    return db.query(Employee).all()
 
 
-# Get single employee by Employee ID API
-@app.get("/api/employees/{emp_id}")
-def get_employee(emp_id: str):
-    db = SessionLocal()
+# =========================
+# GET EMPLOYEE BY EMPLOYEE ID
+# =========================
+@app.get("/api/employees/id/{emp_id}")
+def get_employee_by_emp_id(emp_id: str, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.empId == emp_id).first()
 
-    try:
-        employee = db.query(Employee).filter(Employee.empId == emp_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
 
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
-
-        return employee
-
-    finally:
-        db.close()
+    return employee
 
 
-# Add employee API
+# =========================
+# GET EMPLOYEE BY QR ID
+# =========================
+@app.get("/api/employees/qr/{qr_id}")
+def get_employee_by_qr_id(qr_id: str, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.qrId == qr_id).first()
+
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    return employee
+
+
+# =========================
+# ADD EMPLOYEE
+# =========================
 @app.post("/api/employees")
-def add_employee(data: EmployeeData):
-    db = SessionLocal()
+def add_employee(data: EmployeeData, db: Session = Depends(get_db)):
+    existing = db.query(Employee).filter(Employee.empId == data.empId).first()
 
-    try:
-        existing = db.query(Employee).filter(Employee.empId == data.empId).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Employee ID already exists")
 
-        if existing:
-            raise HTTPException(status_code=400, detail="Employee ID already exists")
+    employee = Employee(
+        qrId=str(uuid.uuid4()),
+        name=data.name.strip(),
+        empId=data.empId.strip(),
+        email=data.email.strip(),
+        department=data.department.strip(),
+        designation=data.designation.strip(),
+        category=data.category.strip()
+    )
 
-        employee = Employee(
-            name=data.name,
-            empId=data.empId,
-            email=data.email,
-            department=data.department,
-            designation=data.designation,
-            category=data.category
-        )
+    db.add(employee)
+    db.commit()
+    db.refresh(employee)
 
-        db.add(employee)
-        db.commit()
-        db.refresh(employee)
-
-        return {
-            "message": "Employee added successfully",
-            "employee": employee
-        }
-
-    finally:
-        db.close()
+    return employee
 
 
-# Update employee API
+# =========================
+# UPDATE EMPLOYEE
+# =========================
 @app.put("/api/employees/{emp_id}")
-def update_employee(emp_id: str, data: EmployeeData):
-    db = SessionLocal()
+def update_employee(emp_id: str, data: EmployeeData, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.empId == emp_id).first()
 
-    try:
-        employee = db.query(Employee).filter(Employee.empId == emp_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
 
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
+    duplicate = db.query(Employee).filter(
+        Employee.empId == data.empId,
+        Employee.id != employee.id
+    ).first()
 
-        employee.name = data.name
-        employee.empId = data.empId
-        employee.email = data.email
-        employee.department = data.department
-        employee.designation = data.designation
-        employee.category = data.category
+    if duplicate:
+        raise HTTPException(status_code=400, detail="Employee ID already exists")
 
-        db.commit()
-        db.refresh(employee)
+    # IMPORTANT:
+    # qrId ko touch nahi karna
+    employee.name = data.name.strip()
+    employee.empId = data.empId.strip()
+    employee.email = data.email.strip()
+    employee.department = data.department.strip()
+    employee.designation = data.designation.strip()
+    employee.category = data.category.strip()
 
-        return {
-            "message": "Employee updated successfully",
-            "employee": employee
-        }
+    db.commit()
+    db.refresh(employee)
 
-    finally:
-        db.close()
+    return employee
 
 
-# Delete employee API
+# =========================
+# DELETE EMPLOYEE
+# =========================
 @app.delete("/api/employees/{emp_id}")
-def delete_employee(emp_id: str):
-    db = SessionLocal()
+def delete_employee(emp_id: str, db: Session = Depends(get_db)):
+    employee = db.query(Employee).filter(Employee.empId == emp_id).first()
 
-    try:
-        employee = db.query(Employee).filter(Employee.empId == emp_id).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee not found")
 
-        if not employee:
-            raise HTTPException(status_code=404, detail="Employee not found")
+    db.delete(employee)
+    db.commit()
 
-        db.delete(employee)
-        db.commit()
-
-        return {"message": "Employee deleted successfully"}
-
-    finally:
-        db.close()
+    return {"message": "Employee deleted successfully"}
 
 
-# Serve frontend files from current project folder
+# =========================
+# FRONTEND
+# =========================
 app.mount("/", StaticFiles(directory=".", html=True), name="frontend")
